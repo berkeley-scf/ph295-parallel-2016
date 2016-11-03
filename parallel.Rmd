@@ -1,0 +1,629 @@
+Workshop on Savio, Parallel R, and Data Storage
+=====================================================
+March 2016
+----------------------------------------------------
+
+Chris Paciorek, Department of Statistics and 
+Berkeley Research Computing, UC Berkeley
+
+```{r setup, include=FALSE}
+library(knitr)
+```
+
+# 0) This workshop
+
+This tutorial covers parallelization in R, use of Savio (and Linux clusters in general), and campus resources for computing and data storage. 
+
+Savio is the campus Linux high-performance computing cluster, run by [Berkeley Research Computing](http://research-it.berkeley.edu/programs/berkeley-research-computing).
+
+This tutorial assumes you have a working knowledge of R. 
+
+Materials for this tutorial, including the R markdown file and associated code files that were used to create this document are available on Github at https://github.com/berkeley-scf/ph295-parallel-2016.  You can download the files by doing a git clone from a terminal window on a UNIX-like machine, as follows:
+```{r, clone, eval=FALSE}
+git clone https://github.com/berkeley-scf/ph295-parallel-2016
+```
+
+The materials are also available as a [zip file](https://github.com/berkeley-scf/ph295-parallel-2016/archive/master.zip).
+
+To create this HTML document, simply compile the corresponding R Markdown file in R as follows.
+```{r, build-html, eval=FALSE}
+Rscript -e "library(knitr); knit2html('parallel.Rmd')"
+```
+
+or use the *Makefile* that is part of the repository.
+
+This material by Christopher Paciorek is licensed under a Creative Commons Attribution 3.0 Unported License.
+
+# 1) Learning resources and links
+
+This workshop is based in part on already-prepared BRC and SCF (Statistical Computing Facility) material and other documentation that you can look at for more details:
+
+ - [Instructions for using the Savio campus Linux cluster](http://research-it.berkeley.edu/services/high-performance-computing)
+ - [Tutorial on basic usage of Savio](https://github.com/ucberkeley/savio-training-intro-2016), in particular the [HTML overview](https://rawgit.com/ucberkeley/savio-training-intro-2016/master/intro.html)
+ - [Tutorial on parallelization on Savio](https://github.com/ucberkeley/savio-training-parallel-2016), in particular the [HTML overview](https://rawgit.com/ucberkeley/savio-training-parallel-2016/master/parallel.html)
+ - [Tutorial on shared memory parallel processing](https://github.com/berkeley-scf/tutorial-parallel-basics), in particular the [HTML overview](https://rawgit.com/berkeley-scf/tutorial-parallel-basics/master/parallel-basics.html)
+ - [Tutorial on distributed memory parallel processing](https://github.com/berkeley-scf/tutorial-parallel-distributed), in particular the [HTML overview](https://rawgit.com/berkeley-scf/tutorial-parallel-distributed/master/parallel-dist.html)
+
+# 2) Computational and big data storage resources
+
+## 2a) Computing 
+
+ - [Savio campus cluster](http://research-it.berkeley.edu/services/high-performance-computing)
+    - ~6600 nodes across ~330 nodes, 64 GB RAM on most nodes but up to 512 GB RAM on high-memory nodes
+    - access through faculty computing allowance or departmental/faculty condos (biostat faculty have 8 nodes in a condo)
+    - Python, R, MATLAB, Spark
+ - [NSF XSEDE network](https://www.xsede.org) of supercomputers
+    - Bridges supercomputer for big data computing, including Spark
+    - many other clusters/supercomputers
+ - Biostatistics 
+    - Linux cluster: 8 nodes x 24 cores/node; 64 Gb RAM per node; SGE queueing
+
+
+**Big picture: if you don't have enough computing resources, don't give up and work on a smaller problem, talk to us at brc@berkeley.edu.**
+
+# 2) Computational and big data storage resources
+
+## 2b) Data storage
+
+ - Unlimited storage in scratch on Savio (old files purged eventually)
+ - Savio "condo" storage: $7000 for 25 TB for 5 years
+ - Unlimited storage on Box through Berkeley (15 GB file limit)
+ - Unlimited storage on Google Drive (bDrive) through Berkeley (5 TB file limit)
+
+See this [Savio link for details on automating transfer into and out of Box and Drive](http://research-it.berkeley.edu/services/high-performance-computing/transferring-data). 
+
+# 3) Parallel processing overview
+
+## 3a) Parallel processing terminology
+
+  - *cores*: We'll use this term to mean the different processing
+units available on a single node.
+  - *nodes*: We'll use this term to mean the different computers,
+each with their own distinct memory, that make up a cluster or supercomputer.
+  - *processes* or *SLURM tasks*: computational instances executing on a machine; multiple
+processes may be executing at once. Ideally we have no more processes than cores on
+a node.
+  - *threads*: multiple paths of execution within a single process;
+the OS sees the threads as a single process, but one can think of
+them as 'lightweight' processes. Ideally when considering the processes
+and their threads, we would have no more processes and threads combined
+than cores on a node.
+ - *computational tasks*: We'll use this to mean the independent computational units that make up the job you submit
+    - each *process* or *SLURM task* might carry out one computational task or might be assigned multiple tasks sequentially or as a group.
+
+# 3) Parallel processing overview
+
+## 3b) Parallel processing approaches
+
+The easiest situation is when your code is *embarrassingly parallel*,
+which means that the different tasks can be done independently and
+the results collected. When the tasks need to interact, things get
+much harder. Much of the material here is focused on embarrassingly
+parallel computation.
+
+In R we can:
+
+  - work in shared memory using multiple cores on a single machine (*foreach* with the *doParallel* backend, *mclapply*, *parLapply*, etc.)
+ - work in shared memory using multiple cores via threaded linear algebra (with a threaded BLAS such as *openBLAS* or *MKL* linked to R)
+ - work in distributed memory across multiple nodes on multiple machines (*foreach* with *doMPI* or *doSNOW*, *parLapply* with *snow*, *pbdR*)
+
+
+# 4) Savio / Linux cluster basics 
+
+## 4a) Overview
+
+The basic steps for using Savio (or similar resources) are:
+
+ - [getting an account](https://docs.google.com/a/berkeley.edu/forms/d/e/1FAIpQLSemSeqZFI5jCvu4KxdQ_7MpQmZaAy57JNjOoGrSay6XbIU9qg/viewform)
+    - through your affiliation with the biostatistics big data training grant
+    - through your advisor's faculty computing allowance
+    - through a condo purchased by your advisor/group/department
+ - [logging on with a one-time password via the Pledge software](http://research-it.berkeley.edu/services/high-performance-computing/logging-savio). Note that the password procedure will be changing shortly.
+ - [transferring data to Savio](http://research-it.berkeley.edu/services/high-performance-computing/transferring-data)
+ - [loading software modules or installing any software you need](http://research-it.berkeley.edu/services/high-performance-computing/accessing-and-installing-software)
+ - [submitting your job(s)](http://research-it.berkeley.edu/services/high-performance-computing/running-your-jobs)
+
+# 4) Savio / Linux cluster basics 
+
+## 4b) Logging on to Savio
+
+To login, you need to have software on your own machine that gives you access to a UNIX terminal (command-line) session. These come built-in with Mac (see `Applications -> Utilities -> Terminal`). For Windows, some options include [PuTTY](http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html).
+
+You also need to set up your smartphone or tablet with *Google Authenticator* to generate one-time passwords for you.
+
+Here are instructions for [doing this setup, and for logging in](http://research-it.berkeley.edu/services/high-performance-computing/logging-savio).
+
+Then to login:
+```
+ssh SAVIO_USERNAME@hpc.brc.berkeley.edu
+```
+
+Then enter XXXXXYYYYYY where XXXXXX is your PIN and YYYYYY is the one-time password. YYYYYY will be shown when you open your *Google authenticator* app on your phone/tablet.
+
+One can then navigate around and get information using standard UNIX commands such as `ls`, `cd`, `du`, `df`, etc.
+
+If you want to be able to open programs with graphical user interfaces:
+```
+ssh -Y SAVIO_USERNAME@hpc.brc.berkeley.edu
+```
+
+To display the graphical windows on your local machine, you'll need X server software on your own machine to manage the graphical windows. For Windows, your options include *eXceed* or *Xming* and for Mac, there is *XQuartz*.
+
+To log on to other Linux clusters/machines, often all you need to do is the `ssh` step above, with a simple fixed password.
+
+# 4) Savio / Linux cluster basics 
+
+## 4c) Data transfer using the command line
+
+We can use the *scp* and *sftp* protocols to transfer files.
+
+You need to use the Savio data transfer node, `dtn.brc.berkeley.edu`.
+
+### Linux/Mac:
+
+```
+# to Savio, while on your local machine
+scp bayArea.csv paciorek@dtn.brc.berkeley.edu:~/.
+scp bayArea.csv paciorek@dtn.brc.berkeley.edu:~/data/newName.csv
+scp bayArea.csv paciorek@dtn.brc.berkeley.edu:/global/scratch/paciorek/.
+
+# from Savio, while on your local machine
+scp paciorek@dtn.brc.berkeley.edu:~/data/newName.csv ~/Desktop/.
+```
+
+If you can ssh to your local machine or want to transfer files to other systems on to which you can ssh, you can use syntax like this, while logged onto Savio:
+
+```
+ssh dtn
+scp ~/file.csv OTHER_USERNAME@other.domain.edu:~/data/.
+```
+
+### Windows and GUI-based programs
+
+One program you can use with Windows is *WinSCP*, and a multi-platform program for doing transfers via SFTP is *FileZilla*. After logging in, you'll see windows for the Savio filesystem and your local filesystem on your machine. You can drag files back and forth.
+
+You can package multiple files (including directory structure) together using tar:
+```
+tar -cvzf files.tgz dir_to_zip file_to_zip file2_to_zip
+# to untar later:
+tar -xvzf files.tgz
+```
+
+# 4) Savio / Linux cluster basics 
+
+## 4d) Accessing software
+
+A lot of software is available on Savio but needs to be loaded from the relevant software module before you can use it.
+
+```
+module list  # what's loaded?
+module avail  # what's available
+```
+
+One thing that tricks people is that the modules are arranged in a hierarchical (nested) fashion, so you only see some of the modules as being available *after* you load the parent module. Here's how we see the R packages that are available.
+
+```
+which R
+R
+
+module avail
+module load R
+which R
+module avail
+module load Rmpi ggplot2
+R
+# library(ggplot2)
+```
+
+## Sidenote: installing h2o and other packages
+
+```
+module load java r ggplot2
+R
+```
+
+```{r, eval=FALSE}
+# needed for h2o:
+install.packages(c('RCurl', 'jsonlite', 'statmod'))
+# install h2o itself
+install.packages("h2o", type="source", 
+  repos=(c("http://h2o-release.s3.amazonaws.com/h2o/rel-turing/9/R")))
+library(h2o)
+localH2O = h2o.init(nthreads=-1)
+demo(h2o.kmeans)
+
+# for demo below, also want:
+install.packages(c('caret', 'mlbench', 'cvAUC', 'devtools'))
+withr::with_libpaths(new = Sys.getenv("R_LIBS_USER"), 
+ devtools::install_github("h2oai/h2o-3/h2o-r/ensemble/h2oEnsemble-package"))
+
+install.packages(c('SuperLearner'))
+```
+
+# 4) Savio / Linux cluster basics 
+
+## 4e) Submitting jobs
+
+All computations are done by submitting jobs to the scheduling software that manages jobs on the cluster, called SLURM.
+
+When submitting a job, the main things you need to indicate are the project account you are using (in some cases you might have access to multiple accounts such as a faculty computing allowance (FCA) and a condo) and the partition.
+
+You can see what accounts you have access to and which partitions within those accounts as follows:
+
+```
+sacctmgr -p show associations user=${USER}
+```
+
+Let's see how to submit a simple job. If your job will only use the resources on a single node, you can do the following. 
+
+
+Here's an example job script *job-example.sh* that I'll run. To run your own job, you'll need to modify the *--account* value and possibly the *--partition* value.
+
+```
+        #!/bin/bash
+        # Job name:
+        #SBATCH --job-name=test
+        #
+        # Account:
+        #SBATCH --account=co_stat
+        #
+        # Partition:
+        #SBATCH --partition=savio2
+        #
+        # Wall clock limit (30 seconds here):
+        #SBATCH --time=00:00:30
+        #
+        ## Command(s) to run:
+        module load java r
+        R CMD BATCH --no-save test_h2o.R test_h2o.Rout
+```
+
+By default this will have access to (and pay for) all the cores on one node.
+
+Now let's submit and monitor the job:
+
+```
+sbatch job.sh
+
+squeue -j JOB_ID
+
+wwall -j JOB_ID
+```
+
+Note that except for the *savio2_htc*  and *savio2_gpu* partitions, all jobs are given exclusive access to the entire node or nodes assigned to the job (and your account is charged for all of the cores on the node(s)). 
+
+# 4) Savio / Linux cluster basics 
+
+## 4f)  Interactive jobs
+
+You can also do work interactively.
+
+For this, you may want to have used the -Y flag to ssh if you are running software with a GUI such as MATLAB. 
+
+```
+# ssh -Y SAVIO_USERNAME@hpc.brc.berkeley.edu
+srun -A co_stat -p savio2  -N 1 -t 10:0 --pty bash
+# now execute on the compute node:
+module load java r
+R
+```
+
+```{r, eval=FALSE}
+library(h2o)
+localH2O = h2o.init(nthreads=-1)
+demo(h2o.kmeans)
+```
+
+# 5) Basic parallel R on one machine/node
+
+One key thing to note here is that for parallelizing independent iterations/replications of a computation (Sections 5.2 and 5.3 here) there are a zillion ways to do this in R, with a variety of functions you can use (foreach, parLapply, mclapply) and a variety of parallel functionality behind the scenes (MPI, SNOW, sockets, pbdR). They'll all likely have similar computation time, so whatever you can make work is likely to be fine. 
+
+Here's how *CV.SuperLearner* parallelizes over folds:
+
+```
+    if (parallel == "seq") {
+        cvList <- lapply(folds, FUN = .crossValFun, Y = Y, dataX = X, 
+            family = family, SL.library = SL.library, method = method, 
+            id = id, obsWeights = obsWeights, verbose = verbose, 
+            control = control, cvControl = cvControl, saveAll = saveAll)
+    }
+    else if (parallel == "multicore") {
+        .SL.require("parallel")
+        cvList <- parallel::mclapply(folds, FUN = .crossValFun, 
+            Y = Y, dataX = X, family = family, SL.library = SL.library, 
+            method = method, id = id, obsWeights = obsWeights, 
+            verbose = verbose, control = control, cvControl = cvControl, 
+            saveAll = saveAll, mc.set.seed = FALSE)
+    }
+    else if (inherits(parallel, "cluster")) {
+        cvList <- parallel::parLapply(parallel, x = folds, fun = .crossValFun, 
+            Y = Y, dataX = X, family = family, SL.library = SL.library, 
+            method = method, id = id, obsWeights = obsWeights, 
+            verbose = verbose, control = control, cvControl = cvControl, 
+            saveAll = saveAll)
+    }
+```
+
+In the examples below, I'll illustrate use of various parallel functionality in R using simple leave-one-out cross-validation for a Random Forest. 
+
+Here's the basic code we'll use:
+
+```{r, eval=FALSE}
+looFit <- function(i, Y, X, family = gaussian()) {
+    out <- SL.randomForest(Y[-i], X[-i, ], X[i, ], family)
+    return(out$pred)
+}
+
+set.seed(23432)
+## training set
+n <- 500
+p <- 50
+X <- matrix(rnorm(n*p), nrow = n, ncol = p)
+colnames(X) <- paste("X", 1:p, sep="")
+X <- data.frame(X)
+Y <- X[, 1] + sqrt(abs(X[, 2] * X[, 3])) + X[, 2] - X[, 3] + rnorm(n)
+```
+
+# 5) Basic parallel R on one machine/node
+
+## 5a) job submission 
+
+Here's an example job submission script, *job-onenode.sh*.
+
+```
+        #!/bin/bash
+        # Job name:
+        #SBATCH --job-name=test
+        #
+        # Account:
+        #SBATCH --account=co_stat
+        #
+        # Partition:
+        #SBATCH --partition=savio2
+        #
+        # Number of nodes:
+        #SBATCH --nodes=1
+        #
+        # Wall clock limit (30 seconds here):
+        #SBATCH --time=00:00:30
+        #
+        ## Command(s) to run:
+        module load r
+        R CMD BATCH --no-save mclapply.R mclapply.Rout
+```
+
+Now simply invoke:
+```
+sbatch job-onenode.sh
+```
+
+# 5) Basic parallel R on one machine/node
+
+## 5b) Using  SLURM environment variables to control your job
+
+When you write your code, you may need to specify information in your code about the number of cores to use. SLURM will provide a variety of variables that you can use in your code so that it adapts to the resources you have requested rather than being hard-coded. 
+
+Here are some of the variables that may be useful: SLURM_NTASKS, SLURM_CPUS_PER_TASK, SLURM_CPUS_ON_NODE, SLURM_NODELIST, SLURM_NNODES.
+
+Here's how you can access those variables in your code:
+
+```
+as.numeric(Sys.getenv('SLURM_NTASKS'))  ## R
+```
+
+To use multiple cores on a node (and thereby fully utilize the node that will be exclusively assigned to your job), be careful if you only specify `--nodes`, as the environment variables will only indicate one task per node.
+
+# 5) Basic parallel R on one machine/node
+
+## 5c) mclapply
+
+Here's how we can apply LOO for this simulated dataset seen above.
+
+```
+library(parallel)
+cores <- as.numeric(Sys.getenv('SLURM_CPUS_ON_NODE'))
+preds <- mclapply(seq_len(n), looFit, Y = Y, X = X, mc.cores = cores)
+```
+
+Note that *mclapply* *forks* the master process, so all loaded packages and objects will be automatically present in the worker processes.
+
+# 5) Basic parallel R on one machine/node
+
+## 5d) parLapply
+
+```
+library(parallel)
+cores <- as.numeric(Sys.getenv('SLURM_CPUS_ON_NODE'))
+cl <- makeCluster(cores) 
+preds <- parLapply(cl, seq_len(n), looFit, Y, X)
+```
+
+*makeCluster* starts up new processes so one needs to reload the needed packages on each worker. Also if one used a variable from the global environment of the master session, you would need to use *clusterExport* to make it available. For example if *X* and *Y* were used in *loo()* without being arguments, you would have needed:
+
+```
+clusterExport(cl, c('X', 'Y'))
+```
+
+# 5) Basic parallel R on one machine/node
+
+## 5e) foreach
+
+```
+library(doParallel)
+
+cores <- as.numeric(Sys.getenv('SLURM_CPUS_ON_NODE'))
+registerDoParallel(cores)
+preds <- foreach(i = seq_len(n)) %dopar% { 
+      looFit(i, Y, X) 
+}
+```
+
+# 6) Basic parallel R on multiple nodes
+
+## 6a) Job submission
+
+If you are submitting a job that uses multiple nodes, you'll need to carefully specify the resources you need. The key flags for use in your job script are:
+
+ - `--nodes` (or `-N`): indicates the number of nodes to use
+ - `--ntasks-per-node`: indicates the number of tasks (i.e., processes) one wants to run on each node
+ - `--cpus-per-task` (or `-c`): indicates the number of cpus to be used for each task
+
+In addition, in some cases it can make sense to use the `--ntasks` (or `-n`) option to indicate the total number of tasks and let the scheduler determine how many nodes and tasks per node are needed. In general `--cpus-per-task` will be 1 except when running threaded code.  
+
+Here's an example job script (*job-multinode.sh*) for a job that uses MPI for parallelizing over multiple nodes:
+
+```
+       #!/bin/bash
+       # Job name:
+       #SBATCH --job-name=test
+       #
+       # Account:
+       #SBATCH --account=co_stat
+       #
+       # Partition:
+       #SBATCH --partition=savio2
+       #
+       # Number of MPI tasks needed for use case (example):
+       #SBATCH --ntasks=48
+       #
+       # Processors per task:
+       #SBATCH --cpus-per-task=1
+       #
+       # Wall clock limit:
+       #SBATCH --time=00:00:30
+       #
+       ## Command(s) to run (example):
+       module load gcc openmpi r 
+       module load Rmpi
+       mpirun R CMD BATCH --no-save doMPI.R doMPI.Rout
+```
+
+## 6a) foreach with doMPI
+
+```
+# install.packages('doMPI')
+source('loo.R')
+library(doMPI)
+
+cl = startMPIcluster()  # by default will start one fewer slave than available cores
+registerDoMPI(cl)
+print(clusterSize(cl))
+
+preds <- foreach(i = seq_len(n), .packages = 'SuperLearner') %dopar% { 
+      looFit(i, Y, X) 
+}
+print(preds[1:10])
+
+closeCluster(cl)
+mpi.quit()
+```
+
+Note that in some cases in which you are not using MPI through SLURM, you may need to indicate the number of MPI processes MPI should start and on what machines they should run. See [my tutorial on distributed memory parallel processing](https://github.com/berkeley-scf/tutorial-parallel-distributed).
+
+## 6b) foreach and parLapply with SNOW clusters
+
+One nice thing about SNOW is that it can avoid having to use MPI, which can be a hassle to setup and maintain (though SNOW can also make use of MPI). So in this case, don't start R via *mpirun* in your job submission script.
+
+To use SNOW in this fashion, we'll need to tell SNOW the machines on which to run the workers and how many workers to run on each machine. Here's an example where I know the machines I want to use in advance.
+
+(NOTE to self: do on arwen not smeagol)
+
+```
+source("loo.R")
+library(snow)
+machines = c(rep("beren.berkeley.edu", 1),
+    rep("gandalf.berkeley.edu", 1),
+    rep("arwen.berkeley.edu", 2))
+
+cl = makeCluster(machines, type = "SOCK")
+source('loo.R')
+```
+
+Now I can either use that cluster with foreach or with parLapply.
+
+```
+library(doSNOW)
+registerDoSNOW(cl)
+
+preds <- foreach(i = seq_len(n), .packages = 'SuperLearner') %dopar% { 
+      looFit(i, Y, X) 
+}
+
+stopCluster(cl)
+```
+
+```
+library(parallel)
+preds <- parLapply(cl, seq_len(n), looFit, Y, X, TRUE)
+
+stopCluster(cl)
+```
+
+# 7) Parallelization strategies
+
+## 7a) Basic principles 
+
+The following are some basic principles/suggestions for how to parallelize
+your computation.
+
+Should I use one machine/node or many machines/nodes?
+
+ - If you can do your computation on the cores of a single node using
+shared memory, that will be faster than using the same number of cores
+(or even somewhat more cores) across multiple nodes. Similarly, jobs
+with a lot of data/high memory requirements that one might think of
+as requiring Spark or Hadoop may in some cases be much faster if you can find
+a single machine with a lot of memory.
+ - That said, if you would run out of memory on a single node, then you'll
+need to use distributed memory.
+
+What level or dimension should I parallelize over?
+
+ - If you have nested loops, you generally only want to parallelize at
+one level of the code. That said, there may be cases in which it is
+helpful to do both. Keep in mind whether your linear algebra is being
+threaded. Often you will want to parallelize over a loop and not use
+threaded linear algebra.
+ - Often it makes sense to parallelize the outer loop when you have nested
+loops.
+ - You generally want to parallelize in such a way that your code is
+load-balanced and does not involve too much communication. 
+
+How do I balance communication overhead with keeping my cores busy?
+
+ - If you have very few tasks, particularly if the tasks take different
+amounts of time, often some of the processors will be idle and your code
+poorly load-balanced.
+ - If you have very many tasks and each one takes little time, the communication
+overhead of starting and stopping the tasks will reduce efficiency.
+
+Should multiple tasks be pre-assigned to a process (i.e., a worker) (sometimes called *prescheduling*) or should tasks
+be assigned dynamically as previous tasks finish? 
+
+ - Basically if you have many tasks that each take similar time, you
+want to preschedule the tasks to reduce communication. If you have few tasks
+or tasks with highly variable completion times, you don't want to
+preschedule, to improve load-balancing.
+ - For R in particular, some of R's parallel functions allow you to say whether the 
+tasks should be prescheduled. E.g., `library(Rmpi); help(mpi.parSapply)` gives some information.
+
+## 7a) Strategy discussion for targeted learning
+
+Parallelization could be over:
+
+ - cross-validation folds
+ - algorithms
+ - within an algorithm (linear algebra or other threading, e.g., for internal cross-validation)
+
+Let's discuss how we might split up our computations based on how many computational tasks there are for each dimension of parallelization, how long tasks take, and how varied the computational time is.
+
+## 8) Getting help
+
+ - For technical issues and questions about using Savio: 
+    - brc-hpc-help@berkeley.edu
+ - For questions about computing resources in general, including cloud computing: 
+    - brc@berkeley.edu
+ - For questions about data management (including HIPAA-protected data): 
+    - researchdata@berkeley.edu
+
+
