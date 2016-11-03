@@ -508,7 +508,7 @@ Here's an example job script (*job-multinode.sh*) for a job that uses MPI for pa
 ## Command(s) to run (example):
 module load gcc openmpi r 
 module load Rmpi
-mpirun R CMD BATCH --no-save doMPI.R doMPI.Rout
+mpirun R CMD BATCH --no-save foreach-multinode-doMPI.R foreach-multinode-doMPI.Rout
 ```
 
 # 6) Basic parallel R on multiple nodes
