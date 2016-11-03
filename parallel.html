@@ -510,6 +510,9 @@ squeue -u paciorek
 squeue -j JOB_ID
 
 wwall -j JOB_ID
+
+# to see everything that is running or queued
+squeue
 </code></pre>
 
 <p>Note that except for the <em>savio2_htc</em>  and <em>savio2_gpu</em> partitions, all jobs are given exclusive access to the entire node or nodes assigned to the job (and your account is charged for all of the cores on the node(s)). </p>
@@ -624,7 +627,7 @@ R CMD BATCH --no-save mclapply.R mclapply.Rout
 
 <p>Here are some of the variables that may be useful: SLURM_NTASKS, SLURM_CPUS_PER_TASK, SLURM_CPUS_ON_NODE, SLURM_NODELIST, SLURM_NNODES.</p>
 
-<p>Here&#39;s how you can access those variables in your code:</p>
+<p>Here&#39;s how you can access those variables in your R code:</p>
 
 <pre><code>as.numeric(Sys.getenv(&#39;SLURM_NTASKS&#39;))  ## R
 </code></pre>
@@ -651,10 +654,10 @@ preds &lt;- mclapply(seq_len(n), looFit, Y = Y, X = X, mc.cores = cores)
 <pre><code>library(parallel)
 cores &lt;- as.numeric(Sys.getenv(&#39;SLURM_CPUS_ON_NODE&#39;))
 cl &lt;- makeCluster(cores) 
-preds &lt;- parLapply(cl, seq_len(n), looFit, Y, X)
+preds &lt;- parLapply(cl, seq_len(n), looFit, Y, X, TRUE)
 </code></pre>
 
-<p><em>makeCluster</em> starts up new processes so one needs to reload the needed packages on each worker. Also if one used a variable from the global environment of the master session, you would need to use <em>clusterExport</em> to make it available. For example if <em>X</em> and <em>Y</em> were used in <em>loo()</em> without being arguments, you would have needed:</p>
+<p><em>makeCluster</em> starts up new processes so one needs to reload the needed packages on each worker (the TRUE gets passed to as the <em>loadLib</em> argument to <em>looFit()</em>. Also if one used a variable from the global environment of the master session, you would need to use <em>clusterExport</em> to make it available. For example if <em>X</em> and <em>Y</em> were used in <em>loo()</em> without being arguments, you would have needed:</p>
 
 <pre><code>clusterExport(cl, c(&#39;X&#39;, &#39;Y&#39;))
 </code></pre>

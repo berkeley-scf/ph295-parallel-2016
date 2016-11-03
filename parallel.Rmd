@@ -421,10 +421,10 @@ Here are some of the variables that may be useful: SLURM_NTASKS, SLURM_CPUS_PER_
 Here's how you can access those variables in your R code:
 
 ```
-as.numeric(Sys.getenv('SLURM_NTASKS'))  ## R
+as.numeric(Sys.getenv('SLURM_NTASKS'))  # invoke this in R
 ```
 
-To use multiple cores on a node (and thereby fully utilize the node that will be exclusively assigned to your job), be careful if you only specify `--nodes`, as the environment variables will only indicate one task per node.
+To use multiple cores on a node (and thereby fully utilize the node that will be exclusively assigned to your job), be careful if you only specify *--nodes*, as the environment variables will only indicate one task per node.
 
 # 5) Basic parallel R on one machine/node
 
@@ -438,7 +438,7 @@ cores <- as.numeric(Sys.getenv('SLURM_CPUS_ON_NODE'))
 preds <- mclapply(seq_len(n), looFit, Y = Y, X = X, mc.cores = cores)
 ```
 
-Note that *mclapply* *forks* the master process, so all loaded packages and objects will be automatically present in the worker processes.
+Note that *mclapply* *forks* the master process (makes copies of the process), so all loaded packages and objects will be automatically present in the worker processes.
 
 # 5) Basic parallel R on one machine/node
 
@@ -448,10 +448,10 @@ Note that *mclapply* *forks* the master process, so all loaded packages and obje
 library(parallel)
 cores <- as.numeric(Sys.getenv('SLURM_CPUS_ON_NODE'))
 cl <- makeCluster(cores) 
-preds <- parLapply(cl, seq_len(n), looFit, Y, X)
+preds <- parLapply(cl, seq_len(n), looFit, Y, X, TRUE)
 ```
 
-*makeCluster* starts up new processes so one needs to reload the needed packages on each worker. Also if one used a variable from the global environment of the master session, you would need to use *clusterExport* to make it available. For example if *X* and *Y* were used in *loo()* without being arguments, you would have needed:
+*makeCluster* starts up new processes so one needs to reload the needed packages on each worker (the TRUE gets passed to as the *loadLib* argument to *looFit()*. Also if one used a variable from the global environment of the master session, you would need to use *clusterExport* to make it available. For example if *X* and *Y* were used in *loo()* without being arguments, you would have needed:
 
 ```
 clusterExport(cl, c('X', 'Y'))
@@ -478,7 +478,7 @@ preds <- foreach(i = seq_len(n)) %dopar% {
 If you are submitting a job that uses multiple nodes, you'll need to carefully specify the resources you need. The key flags for use in your job script are:
 
  - `--nodes` (or `-N`): indicates the number of nodes to use
- - `--ntasks-per-node`: indicates the number of tasks (i.e., processes) one wants to run on each node
+ - `--ntasks-per-node`: indicates the number of SLURM tasks (i.e., processes) one wants to run on each node
  - `--cpus-per-task` (or `-c`): indicates the number of cpus to be used for each task
 
 In addition, in some cases it can make sense to use the `--ntasks` (or `-n`) option to indicate the total number of tasks and let the scheduler determine how many nodes and tasks per node are needed. In general `--cpus-per-task` will be 1 except when running threaded code.  
@@ -486,30 +486,32 @@ In addition, in some cases it can make sense to use the `--ntasks` (or `-n`) opt
 Here's an example job script (*job-multinode.sh*) for a job that uses MPI for parallelizing over multiple nodes:
 
 ```
-       #!/bin/bash
-       # Job name:
-       #SBATCH --job-name=test
-       #
-       # Account:
-       #SBATCH --account=co_stat
-       #
-       # Partition:
-       #SBATCH --partition=savio2
-       #
-       # Number of MPI tasks needed for use case (example):
-       #SBATCH --ntasks=48
-       #
-       # Processors per task:
-       #SBATCH --cpus-per-task=1
-       #
-       # Wall clock limit:
-       #SBATCH --time=00:00:30
-       #
-       ## Command(s) to run (example):
-       module load gcc openmpi r 
-       module load Rmpi
-       mpirun R CMD BATCH --no-save doMPI.R doMPI.Rout
+#!/bin/bash
+# Job name:
+#SBATCH --job-name=test
+#
+# Account:
+#SBATCH --account=co_stat
+#
+# Partition:
+#SBATCH --partition=savio2
+#
+# Number of MPI tasks needed for use case (example):
+#SBATCH --ntasks=48
+#
+# Processors per task:
+#SBATCH --cpus-per-task=1
+#
+# Wall clock limit (15 minutes here):
+#SBATCH --time=00:15:00
+#
+## Command(s) to run (example):
+module load gcc openmpi r 
+module load Rmpi
+mpirun R CMD BATCH --no-save doMPI.R doMPI.Rout
 ```
+
+# 6) Basic parallel R on multiple nodes
 
 ## 6a) foreach with doMPI
 

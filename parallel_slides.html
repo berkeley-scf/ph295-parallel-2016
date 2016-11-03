@@ -244,7 +244,10 @@ squeue -u paciorek
 
 squeue -j JOB_ID
 
-wwall -j JOB_ID</code></pre>
+wwall -j JOB_ID
+
+# to see everything that is running or queued
+squeue</code></pre>
 <p>Note that except for the <em>savio2_htc</em> and <em>savio2_gpu</em> partitions, all jobs are given exclusive access to the entire node or nodes assigned to the job (and your account is charged for all of the cores on the node(s)).</p>
 </div>
 <div id="savio-linux-cluster-basics-5" class="slide section level1">
@@ -336,7 +339,7 @@ R CMD BATCH --no-save mclapply.R mclapply.Rout</code></pre>
 <h2 id="c-using-slurm-environment-variables-to-control-your-job">5c) Using SLURM environment variables to control your job</h2>
 <p>When you write your code, you may need to specify information in your code about the number of cores to use. SLURM will provide a variety of variables that you can use in your code so that it adapts to the resources you have requested rather than being hard-coded.</p>
 <p>Here are some of the variables that may be useful: SLURM_NTASKS, SLURM_CPUS_PER_TASK, SLURM_CPUS_ON_NODE, SLURM_NODELIST, SLURM_NNODES.</p>
-<p>Here's how you can access those variables in your code:</p>
+<p>Here's how you can access those variables in your R code:</p>
 <pre><code>as.numeric(Sys.getenv('SLURM_NTASKS'))  ## R</code></pre>
 <p>To use multiple cores on a node (and thereby fully utilize the node that will be exclusively assigned to your job), be careful if you only specify <code>--nodes</code>, as the environment variables will only indicate one task per node.</p>
 </div>
@@ -355,8 +358,8 @@ preds &lt;- mclapply(seq_len(n), looFit, Y = Y, X = X, mc.cores = cores)</code><
 <pre><code>library(parallel)
 cores &lt;- as.numeric(Sys.getenv('SLURM_CPUS_ON_NODE'))
 cl &lt;- makeCluster(cores) 
-preds &lt;- parLapply(cl, seq_len(n), looFit, Y, X)</code></pre>
-<p><em>makeCluster</em> starts up new processes so one needs to reload the needed packages on each worker. Also if one used a variable from the global environment of the master session, you would need to use <em>clusterExport</em> to make it available. For example if <em>X</em> and <em>Y</em> were used in <em>loo()</em> without being arguments, you would have needed:</p>
+preds &lt;- parLapply(cl, seq_len(n), looFit, Y, X, TRUE)</code></pre>
+<p><em>makeCluster</em> starts up new processes so one needs to reload the needed packages on each worker (the TRUE gets passed to as the <em>loadLib</em> argument to <em>looFit()</em>. Also if one used a variable from the global environment of the master session, you would need to use <em>clusterExport</em> to make it available. For example if <em>X</em> and <em>Y</em> were used in <em>loo()</em> without being arguments, you would have needed:</p>
 <pre><code>clusterExport(cl, c('X', 'Y'))</code></pre>
 </div>
 <div id="basic-parallel-r-on-one-machinenode-5" class="slide section level1">
