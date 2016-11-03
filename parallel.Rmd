@@ -418,7 +418,7 @@ When you write your code, you may need to specify information in your code about
 
 Here are some of the variables that may be useful: SLURM_NTASKS, SLURM_CPUS_PER_TASK, SLURM_CPUS_ON_NODE, SLURM_NODELIST, SLURM_NNODES.
 
-Here's how you can access those variables in your code:
+Here's how you can access those variables in your R code:
 
 ```
 as.numeric(Sys.getenv('SLURM_NTASKS'))  ## R
