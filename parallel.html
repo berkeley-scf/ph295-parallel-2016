@@ -440,6 +440,7 @@ R
 <h2>Sidenote: installing h2o and other packages</h2>
 
 <pre><code>module load java r ggplot2
+module load Rmpi # for doMPI
 R
 </code></pre>
 
@@ -458,6 +459,8 @@ withr::with_libpaths(new = Sys.getenv(&quot;R_LIBS_USER&quot;),
  devtools::install_github(&quot;h2oai/h2o-3/h2o-r/ensemble/h2oEnsemble-package&quot;))
 
 install.packages(c(&#39;SuperLearner&#39;))
+
+install.packages(c(&#39;doMPI&#39;))
 
 # where are packages installed?
 .libPaths()
@@ -514,6 +517,8 @@ wwall -j JOB_ID
 # to see everything that is running or queued
 squeue
 </code></pre>
+
+<p>To see error and output messages, look in any output files that your code creates and in <em>slurm-JOB_ID.out</em>.</p>
 
 <p>Note that except for the <em>savio2_htc</em>  and <em>savio2_gpu</em> partitions, all jobs are given exclusive access to the entire node or nodes assigned to the job (and your account is charged for all of the cores on the node(s)). </p>
 
@@ -629,10 +634,10 @@ R CMD BATCH --no-save mclapply.R mclapply.Rout
 
 <p>Here&#39;s how you can access those variables in your R code:</p>
 
-<pre><code>as.numeric(Sys.getenv(&#39;SLURM_NTASKS&#39;))  ## R
+<pre><code>as.numeric(Sys.getenv(&#39;SLURM_NTASKS&#39;))  # invoke this in R
 </code></pre>
 
-<p>To use multiple cores on a node (and thereby fully utilize the node that will be exclusively assigned to your job), be careful if you only specify <code>--nodes</code>, as the environment variables will only indicate one task per node.</p>
+<p>To use multiple cores on a node (and thereby fully utilize the node that will be exclusively assigned to your job), be careful if you only specify <em>&ndash;nodes</em>, as the environment variables will only indicate one task per node.</p>
 
 <h1>5) Basic parallel R on one machine/node</h1>
 
@@ -645,7 +650,7 @@ cores &lt;- as.numeric(Sys.getenv(&#39;SLURM_CPUS_ON_NODE&#39;))
 preds &lt;- mclapply(seq_len(n), looFit, Y = Y, X = X, mc.cores = cores)
 </code></pre>
 
-<p>Note that <em>mclapply</em> <em>forks</em> the master process, so all loaded packages and objects will be automatically present in the worker processes.</p>
+<p>Note that <em>mclapply</em> <em>forks</em> the master process (makes copies of the process), so all loaded packages and objects will be automatically present in the worker processes.</p>
 
 <h1>5) Basic parallel R on one machine/node</h1>
 
@@ -683,7 +688,7 @@ preds &lt;- foreach(i = seq_len(n)) %dopar% {
 
 <ul>
 <li><code>--nodes</code> (or <code>-N</code>): indicates the number of nodes to use</li>
-<li><code>--ntasks-per-node</code>: indicates the number of tasks (i.e., processes) one wants to run on each node</li>
+<li><code>--ntasks-per-node</code>: indicates the number of SLURM tasks (i.e., processes) one wants to run on each node</li>
 <li><code>--cpus-per-task</code> (or <code>-c</code>): indicates the number of cpus to be used for each task</li>
 </ul>
 
@@ -691,45 +696,45 @@ preds &lt;- foreach(i = seq_len(n)) %dopar% {
 
 <p>Here&#39;s an example job script (<em>job-multinode.sh</em>) for a job that uses MPI for parallelizing over multiple nodes:</p>
 
-<pre><code>       #!/bin/bash
-       # Job name:
-       #SBATCH --job-name=test
-       #
-       # Account:
-       #SBATCH --account=co_stat
-       #
-       # Partition:
-       #SBATCH --partition=savio2
-       #
-       # Number of MPI tasks needed for use case (example):
-       #SBATCH --ntasks=48
-       #
-       # Processors per task:
-       #SBATCH --cpus-per-task=1
-       #
-       # Wall clock limit:
-       #SBATCH --time=00:00:30
-       #
-       ## Command(s) to run (example):
-       module load gcc openmpi r 
-       module load Rmpi
-       mpirun R CMD BATCH --no-save doMPI.R doMPI.Rout
+<pre><code>#!/bin/bash
+# Job name:
+#SBATCH --job-name=test
+#
+# Account:
+#SBATCH --account=co_stat
+#
+# Partition:
+#SBATCH --partition=savio2
+#
+# Number of MPI tasks needed for use case (example):
+#SBATCH --ntasks=48
+#
+# Processors per task:
+#SBATCH --cpus-per-task=1
+#
+# Wall clock limit (15 minutes here):
+#SBATCH --time=00:15:00
+#
+## Command(s) to run (example):
+module load gcc openmpi r 
+module load Rmpi
+mpirun R CMD BATCH --no-save foreach-multinode-doMPI.R \
+   foreach-multinode-doMPI.Rout
 </code></pre>
 
-<h2>6a) foreach with doMPI</h2>
+<h1>6) Basic parallel R on multiple nodes</h1>
 
-<pre><code># install.packages(&#39;doMPI&#39;)
-source(&#39;loo.R&#39;)
+<h2>6b) foreach with doMPI</h2>
+
+<pre><code>source(&#39;loo.R&#39;)
 library(doMPI)
 
-cl = startMPIcluster()  # by default will start one fewer slave than available cores
+cl = startMPIcluster()  # default starts one fewer slave than available cores
 registerDoMPI(cl)
-print(clusterSize(cl))
 
 preds &lt;- foreach(i = seq_len(n), .packages = &#39;SuperLearner&#39;) %dopar% { 
       looFit(i, Y, X) 
 }
-print(preds[1:10])
 
 closeCluster(cl)
 mpi.quit()
@@ -737,13 +742,15 @@ mpi.quit()
 
 <p>Note that in some cases in which you are not using MPI through SLURM, you may need to indicate the number of MPI processes MPI should start and on what machines they should run. See <a href="https://github.com/berkeley-scf/tutorial-parallel-distributed">my tutorial on distributed memory parallel processing</a>.</p>
 
-<h2>6b) foreach and parLapply with SNOW clusters</h2>
+<h1>6) Basic parallel R on multiple nodes</h1>
+
+<h2>6c) foreach and parLapply with SNOW clusters</h2>
 
 <p>One nice thing about SNOW is that it can avoid having to use MPI, which can be a hassle to setup and maintain (though SNOW can also make use of MPI). So in this case, don&#39;t start R via <em>mpirun</em> in your job submission script.</p>
 
 <p>To use SNOW in this fashion, we&#39;ll need to tell SNOW the machines on which to run the workers and how many workers to run on each machine. Here&#39;s an example where I know the machines I want to use in advance.</p>
 
-<p>(NOTE to self: do on arwen not smeagol)</p>
+<p>(NOTE to self: demonstrate on arwen not smeagol)</p>
 
 <pre><code>source(&quot;loo.R&quot;)
 library(snow)
@@ -752,10 +759,9 @@ machines = c(rep(&quot;beren.berkeley.edu&quot;, 1),
     rep(&quot;arwen.berkeley.edu&quot;, 2))
 
 cl = makeCluster(machines, type = &quot;SOCK&quot;)
-source(&#39;loo.R&#39;)
 </code></pre>
 
-<p>Now I can either use that cluster with foreach or with parLapply.</p>
+<p>Now I can either use that cluster with <em>foreach</em> or with <em>parLapply</em>.</p>
 
 <pre><code>library(doSNOW)
 registerDoSNOW(cl)
@@ -780,7 +786,7 @@ stopCluster(cl)
 <p>The following are some basic principles/suggestions for how to parallelize
 your computation.</p>
 
-<p>Should I use one machine/node or many machines/nodes?</p>
+<h1>Should I use one machine/node or many machines/nodes?</h1>
 
 <ul>
 <li>If you can do your computation on the cores of a single node using
@@ -793,7 +799,7 @@ a single machine with a lot of memory.</li>
 need to use distributed memory.</li>
 </ul>
 
-<p>What level or dimension should I parallelize over?</p>
+<h1>What level or dimension should I parallelize over?</h1>
 
 <ul>
 <li>If you have nested loops, you generally only want to parallelize at
@@ -807,7 +813,7 @@ loops.</li>
 load-balanced and does not involve too much communication. </li>
 </ul>
 
-<p>How do I balance communication overhead with keeping my cores busy?</p>
+<h1>How do I balance communication overhead with keeping my cores busy?</h1>
 
 <ul>
 <li>If you have very few tasks, particularly if the tasks take different
@@ -817,8 +823,7 @@ poorly load-balanced.</li>
 overhead of starting and stopping the tasks will reduce efficiency.</li>
 </ul>
 
-<p>Should multiple tasks be pre-assigned to a process (i.e., a worker) (sometimes called <em>prescheduling</em>) or should tasks
-be assigned dynamically as previous tasks finish? </p>
+<h1>Should multiple tasks be pre-assigned to a process (i.e., a worker) (sometimes called <em>prescheduling</em>) or should tasks be assigned dynamically as previous tasks finish?</h1>
 
 <ul>
 <li>Basically if you have many tasks that each take similar time, you
@@ -829,7 +834,9 @@ preschedule, to improve load-balancing.</li>
 tasks should be prescheduled. E.g., <code>library(Rmpi); help(mpi.parSapply)</code> gives some information.</li>
 </ul>
 
-<h2>7a) Strategy discussion for targeted learning</h2>
+<h1>7) Parallelization strategies</h1>
+
+<h2>7b) Strategy discussion for targeted learning</h2>
 
 <p>Parallelization could be over:</p>
 
@@ -841,7 +848,7 @@ tasks should be prescheduled. E.g., <code>library(Rmpi); help(mpi.parSapply)</co
 
 <p>Let&#39;s discuss how we might split up our computations based on how many computational tasks there are for each dimension of parallelization, how long tasks take, and how varied the computational time is.</p>
 
-<h2>8) Getting help</h2>
+<h1>8) Getting help</h1>
 
 <ul>
 <li>For technical issues and questions about using Savio: 
