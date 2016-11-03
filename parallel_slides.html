@@ -168,7 +168,7 @@ scp ~/file.csv OTHER_USERNAME@other.domain.edu:~/data/.</code></pre>
 <h3 id="windows-and-gui-based-programs">Windows and GUI-based programs</h3>
 <p>One program you can use with Windows is <em>WinSCP</em>, and a multi-platform program for doing transfers via SFTP is <em>FileZilla</em>. After logging in, you'll see windows for the Savio filesystem and your local filesystem on your machine. You can drag files back and forth.</p>
 <p>You can package multiple files (including directory structure) together using tar:</p>
-<pre><code>tar -cvzf files.tgz dir_to_zip 
+<pre><code>tar -cvzf files.tgz dir_to_zip file_to_zip file2_to_zip
 # to untar later:
 tar -xvzf files.tgz</code></pre>
 </div>
@@ -186,51 +186,61 @@ module avail
 module load R
 which R
 module avail
-module load Rmpi ggplot2numpy
+module load Rmpi ggplot2
 R
 # library(ggplot2)</code></pre>
-<h2 id="sidenote-installing-h2o">Sidenote: installing h2o</h2>
+<h2 id="sidenote-installing-h2o-and-other-packages">Sidenote: installing h2o and other packages</h2>
 <pre><code>module load java r ggplot2
 R</code></pre>
 <pre class="sourceCode r"><code class="sourceCode r"><span class="co"># needed for h2o:</span>
 <span class="kw">install.packages</span>(<span class="kw">c</span>(<span class="st">'RCurl'</span>, <span class="st">'jsonlite'</span>, <span class="st">'statmod'</span>))
 <span class="co"># install h2o itself</span>
-<span class="kw">install.packages</span>(<span class="st">&quot;h2o&quot;</span>, <span class="dt">type=</span><span class="st">&quot;source&quot;</span>, <span class="dt">repos=</span>(<span class="kw">c</span>(<span class="st">&quot;http://h2o-release.s3.amazonaws.com/h2o/rel-turing/9/R&quot;</span>)))
+<span class="kw">install.packages</span>(<span class="st">&quot;h2o&quot;</span>, <span class="dt">type=</span><span class="st">&quot;source&quot;</span>, 
+  <span class="dt">repos=</span>(<span class="kw">c</span>(<span class="st">&quot;http://h2o-release.s3.amazonaws.com/h2o/rel-turing/9/R&quot;</span>)))
 <span class="kw">library</span>(h2o)
 localH2O =<span class="st"> </span><span class="kw">h2o.init</span>(<span class="dt">nthreads=</span>-<span class="dv">1</span>)
 <span class="kw">demo</span>(h2o.kmeans)
 
 <span class="co"># for demo below, also want:</span>
 <span class="kw">install.packages</span>(<span class="kw">c</span>(<span class="st">'caret'</span>, <span class="st">'mlbench'</span>, <span class="st">'cvAUC'</span>, <span class="st">'devtools'</span>))
-withr::<span class="kw">with_libpaths</span>(<span class="dt">new =</span> <span class="kw">Sys.getenv</span>(<span class="st">&quot;R_LIBS_USER&quot;</span>), devtools::<span class="kw">install_github</span>(<span class="st">&quot;h2oai/h2o-3/h2o-r/ensemble/h2oEnsemble-package&quot;</span>))</code></pre>
+withr::<span class="kw">with_libpaths</span>(<span class="dt">new =</span> <span class="kw">Sys.getenv</span>(<span class="st">&quot;R_LIBS_USER&quot;</span>), 
+ devtools::<span class="kw">install_github</span>(<span class="st">&quot;h2oai/h2o-3/h2o-r/ensemble/h2oEnsemble-package&quot;</span>))
+
+<span class="kw">install.packages</span>(<span class="kw">c</span>(<span class="st">'SuperLearner'</span>))
+
+<span class="co"># where are packages installed?</span>
+<span class="kw">.libPaths</span>()</code></pre>
+<pre><code>ls /global/home/users/${USER}/R/x86_64-pc-linux-gnu-library/3.2</code></pre>
 </div>
 <div id="savio-linux-cluster-basics-4" class="slide section level1">
 <h1>4) Savio / Linux cluster basics</h1>
 <h2 id="e-submitting-jobs">4e) Submitting jobs</h2>
 <p>All computations are done by submitting jobs to the scheduling software that manages jobs on the cluster, called SLURM.</p>
-<p>When submitting a job, the main things you need to indicate are the project account you are using (in some cases you might have access to multiple accounts such as an FCA and a condo) and the partition.</p>
+<p>When submitting a job, the main things you need to indicate are the project account you are using (in some cases you might have access to multiple accounts such as a faculty computing allowance (FCA) and a condo) and the partition.</p>
 <p>You can see what accounts you have access to and which partitions within those accounts as follows:</p>
-<pre><code>sacctmgr -p show associations user=SAVIO_USERNAME</code></pre>
+<pre><code>sacctmgr -p show associations user=${USER}</code></pre>
 <p>Let's see how to submit a simple job. If your job will only use the resources on a single node, you can do the following.</p>
-<p>Here's an example job script that I'll run. You'll need to modify the --account value and possibly the --partition value.</p>
-<pre><code>        #!/bin/bash
-        # Job name:
-        #SBATCH --job-name=test
-        #
-        # Account:
-        #SBATCH --account=co_stat
-        #
-        # Partition:
-        #SBATCH --partition=savio2
-        #
-        # Wall clock limit (30 seconds here):
-        #SBATCH --time=00:00:30
-        #
-        ## Command(s) to run:
-        module load java r
-        R CMD BATCH --no-save test_h2o.R test_h2o.Rout</code></pre>
+<p>Here's an example job script <em>job-example.sh</em> that I'll run. To run your own job, you'll need to modify the <em>--account</em> value and possibly the <em>--partition</em> value.</p>
+<pre><code>#!/bin/bash
+# Job name:
+#SBATCH --job-name=test
+#
+# Account:
+#SBATCH --account=co_stat
+#
+# Partition:
+#SBATCH --partition=savio2
+#
+# Wall clock limit (30 seconds here):
+#SBATCH --time=00:00:30
+#
+## Command(s) to run:
+module load java r ggplot2
+R CMD BATCH --no-save test_h2o.R test_h2o.Rout</code></pre>
 <p>Now let's submit and monitor the job:</p>
-<pre><code>sbatch job.sh
+<pre><code>sbatch job-example.sh
+
+squeue -u paciorek
 
 squeue -j JOB_ID
 
@@ -241,9 +251,9 @@ wwall -j JOB_ID</code></pre>
 <h1>4) Savio / Linux cluster basics</h1>
 <h2 id="f-interactive-jobs">4f) Interactive jobs</h2>
 <p>You can also do work interactively.</p>
-<p>For this, you may want to have used the -Y flag to ssh if you are running software with a GUI such as MATLAB.</p>
+<p>For this, you may want to have used the -Y flag to ssh if you are running software with a GUI such as MATLAB or wanting to be able to display plots in R or similar software.</p>
 <pre><code># ssh -Y SAVIO_USERNAME@hpc.brc.berkeley.edu
-srun -A co_stat -p savio2  -N 1 -t 10:0 --pty bash
+srun -A co_stat -p savio2  --nodes=1 --time=00:10:00 --pty bash
 # now execute on the compute node:
 module load java r
 R</code></pre>
@@ -253,10 +263,10 @@ localH2O =<span class="st"> </span><span class="kw">h2o.init</span>(<span class=
 </div>
 <div id="basic-parallel-r-on-one-machinenode" class="slide section level1">
 <h1>5) Basic parallel R on one machine/node</h1>
-<p>One key thing to note here is that for parallelizing independent iterations/replications of a computation (Sections 5.2 and 5.3 here) there are a zillion ways to do this in R, with a variety of functions you can use (foreach, parLapply, mclapply) and a variety of parallel functionality behind the scenes (MPI, SNOW, sockets, pbdR). They'll all likely have similar computation time, so whatever you can make work is likely to be fine.</p>
+<p>One key thing to note here is that for parallelizing independent iterations/replications of a computation (as in Sections 5 and 6 here) there are a zillion ways to do this in R, with a variety of functions you can use (foreach, parLapply, mclapply) and a variety of parallel functionality behind the scenes (MPI, SNOW, sockets, pbdR). They'll all likely have similar computation time, so whatever you can make work is likely to be fine.</p>
 <p>Here's how <em>CV.SuperLearner</em> parallelizes over folds:</p>
 <pre><code>    if (parallel == &quot;seq&quot;) {
-        cvList &lt;- lapply(folds, FUN = .crossValFun, Y = Y, dataX = X, 
+       cvList &lt;- lapply(folds, FUN = .crossValFun, Y = Y, dataX = X, 
             family = family, SL.library = SL.library, method = method, 
             id = id, obsWeights = obsWeights, verbose = verbose, 
             control = control, cvControl = cvControl, saveAll = saveAll)
@@ -276,6 +286,9 @@ localH2O =<span class="st"> </span><span class="kw">h2o.init</span>(<span class=
             verbose = verbose, control = control, cvControl = cvControl, 
             saveAll = saveAll)
     }</code></pre>
+</div>
+<div id="a-basic-example-well-use" class="slide section level1">
+<h1>5a) Basic example we'll use</h1>
 <p>In the examples below, I'll illustrate use of various parallel functionality in R using simple leave-one-out cross-validation for a Random Forest.</p>
 <p>Here's the basic code we'll use:</p>
 <pre class="sourceCode r"><code class="sourceCode r">looFit &lt;-<span class="st"> </span>function(i, Y, X, <span class="dt">family =</span> <span class="kw">gaussian</span>()) {
@@ -294,33 +307,33 @@ Y &lt;-<span class="st"> </span>X[, <span class="dv">1</span>] +<span class="st"
 </div>
 <div id="basic-parallel-r-on-one-machinenode-1" class="slide section level1">
 <h1>5) Basic parallel R on one machine/node</h1>
-<h2 id="a-job-submission">5a) job submission</h2>
+<h2 id="b-job-submission">5b) job submission</h2>
 <p>Here's an example job submission script, <em>job-onenode.sh</em>.</p>
-<pre><code>        #!/bin/bash
-        # Job name:
-        #SBATCH --job-name=test
-        #
-        # Account:
-        #SBATCH --account=co_stat
-        #
-        # Partition:
-        #SBATCH --partition=savio2
-        #
-        # Number of nodes:
-        #SBATCH --nodes=1
-        #
-        # Wall clock limit (30 seconds here):
-        #SBATCH --time=00:00:30
-        #
-        ## Command(s) to run:
-        module load r
-        R CMD BATCH --no-save mclapply.R mclapply.Rout</code></pre>
+<pre><code>#!/bin/bash
+# Job name:
+#SBATCH --job-name=test
+#
+# Account:
+#SBATCH --account=co_stat
+#
+# Partition:
+#SBATCH --partition=savio2
+#
+# Number of nodes:
+#SBATCH --nodes=1
+#
+# Wall clock limit (30 seconds here):
+#SBATCH --time=00:00:30
+#
+## Command(s) to run:
+module load r
+R CMD BATCH --no-save mclapply.R mclapply.Rout</code></pre>
 <p>Now simply invoke:</p>
 <pre><code>sbatch job-onenode.sh</code></pre>
 </div>
 <div id="basic-parallel-r-on-one-machinenode-2" class="slide section level1">
 <h1>5) Basic parallel R on one machine/node</h1>
-<h2 id="b-using-slurm-environment-variables-to-control-your-job">5b) Using SLURM environment variables to control your job</h2>
+<h2 id="c-using-slurm-environment-variables-to-control-your-job">5c) Using SLURM environment variables to control your job</h2>
 <p>When you write your code, you may need to specify information in your code about the number of cores to use. SLURM will provide a variety of variables that you can use in your code so that it adapts to the resources you have requested rather than being hard-coded.</p>
 <p>Here are some of the variables that may be useful: SLURM_NTASKS, SLURM_CPUS_PER_TASK, SLURM_CPUS_ON_NODE, SLURM_NODELIST, SLURM_NNODES.</p>
 <p>Here's how you can access those variables in your code:</p>
@@ -329,7 +342,7 @@ Y &lt;-<span class="st"> </span>X[, <span class="dv">1</span>] +<span class="st"
 </div>
 <div id="basic-parallel-r-on-one-machinenode-3" class="slide section level1">
 <h1>5) Basic parallel R on one machine/node</h1>
-<h2 id="c-mclapply">5c) mclapply</h2>
+<h2 id="d-mclapply">5d) mclapply</h2>
 <p>Here's how we can apply LOO for this simulated dataset seen above.</p>
 <pre><code>library(parallel)
 cores &lt;- as.numeric(Sys.getenv('SLURM_CPUS_ON_NODE'))
@@ -338,7 +351,7 @@ preds &lt;- mclapply(seq_len(n), looFit, Y = Y, X = X, mc.cores = cores)</code><
 </div>
 <div id="basic-parallel-r-on-one-machinenode-4" class="slide section level1">
 <h1>5) Basic parallel R on one machine/node</h1>
-<h2 id="d-parlapply">5d) parLapply</h2>
+<h2 id="e-parlapply">5e) parLapply</h2>
 <pre><code>library(parallel)
 cores &lt;- as.numeric(Sys.getenv('SLURM_CPUS_ON_NODE'))
 cl &lt;- makeCluster(cores) 
@@ -348,7 +361,7 @@ preds &lt;- parLapply(cl, seq_len(n), looFit, Y, X)</code></pre>
 </div>
 <div id="basic-parallel-r-on-one-machinenode-5" class="slide section level1">
 <h1>5) Basic parallel R on one machine/node</h1>
-<h2 id="e-foreach">5e) foreach</h2>
+<h2 id="f-foreach">5f) foreach</h2>
 <pre><code>library(doParallel)
 
 cores &lt;- as.numeric(Sys.getenv('SLURM_CPUS_ON_NODE'))
@@ -359,7 +372,7 @@ preds &lt;- foreach(i = seq_len(n)) %dopar% {
 </div>
 <div id="basic-parallel-r-on-multiple-nodes" class="slide section level1">
 <h1>6) Basic parallel R on multiple nodes</h1>
-<h2 id="a-job-submission-1">6a) Job submission</h2>
+<h2 id="a-job-submission">6a) Job submission</h2>
 <p>If you are submitting a job that uses multiple nodes, you'll need to carefully specify the resources you need. The key flags for use in your job script are:</p>
 <ul>
 <li><code>--nodes</code> (or <code>-N</code>): indicates the number of nodes to use</li>

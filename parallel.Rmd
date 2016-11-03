@@ -238,6 +238,13 @@ withr::with_libpaths(new = Sys.getenv("R_LIBS_USER"),
  devtools::install_github("h2oai/h2o-3/h2o-r/ensemble/h2oEnsemble-package"))
 
 install.packages(c('SuperLearner'))
+
+# where are packages installed?
+.libPaths()
+```
+
+```
+ls /global/home/users/${USER}/R/x86_64-pc-linux-gnu-library/3.2
 ```
 
 # 4) Savio / Linux cluster basics 
@@ -260,30 +267,31 @@ Let's see how to submit a simple job. If your job will only use the resources on
 Here's an example job script *job-example.sh* that I'll run. To run your own job, you'll need to modify the *--account* value and possibly the *--partition* value.
 
 ```
-        #!/bin/bash
-        # Job name:
-        #SBATCH --job-name=test
-        #
-        # Account:
-        #SBATCH --account=co_stat
-        #
-        # Partition:
-        #SBATCH --partition=savio2
-        #
-        # Wall clock limit (30 seconds here):
-        #SBATCH --time=00:00:30
-        #
-        ## Command(s) to run:
-        module load java r
-        R CMD BATCH --no-save test_h2o.R test_h2o.Rout
+#!/bin/bash
+# Job name:
+#SBATCH --job-name=test
+#
+# Account:
+#SBATCH --account=co_stat
+#
+# Partition:
+#SBATCH --partition=savio2
+#
+# Wall clock limit (30 seconds here):
+#SBATCH --time=00:00:30
+#
+## Command(s) to run:
+module load java r ggplot2
+R CMD BATCH --no-save test_h2o.R test_h2o.Rout
 ```
 
-By default this will have access to (and pay for) all the cores on one node.
 
 Now let's submit and monitor the job:
 
 ```
-sbatch job.sh
+sbatch job-example.sh
+
+squeue -u paciorek
 
 squeue -j JOB_ID
 
@@ -298,11 +306,11 @@ Note that except for the *savio2_htc*  and *savio2_gpu* partitions, all jobs are
 
 You can also do work interactively.
 
-For this, you may want to have used the -Y flag to ssh if you are running software with a GUI such as MATLAB. 
+For this, you may want to have used the -Y flag to ssh if you are running software with a GUI such as MATLAB or wanting to be able to display plots in R or similar software. 
 
 ```
 # ssh -Y SAVIO_USERNAME@hpc.brc.berkeley.edu
-srun -A co_stat -p savio2  -N 1 -t 10:0 --pty bash
+srun -A co_stat -p savio2  --nodes=1 --time=00:10:00 --pty bash
 # now execute on the compute node:
 module load java r
 R
@@ -316,13 +324,13 @@ demo(h2o.kmeans)
 
 # 5) Basic parallel R on one machine/node
 
-One key thing to note here is that for parallelizing independent iterations/replications of a computation (Sections 5.2 and 5.3 here) there are a zillion ways to do this in R, with a variety of functions you can use (foreach, parLapply, mclapply) and a variety of parallel functionality behind the scenes (MPI, SNOW, sockets, pbdR). They'll all likely have similar computation time, so whatever you can make work is likely to be fine. 
+One key thing to note here is that for parallelizing independent iterations/replications of a computation (as in Sections 5 and 6 here) there are a zillion ways to do this in R, with a variety of functions you can use (foreach, parLapply, mclapply) and a variety of parallel functionality behind the scenes (MPI, SNOW, sockets, pbdR). They'll all likely have similar computation time, so whatever you can make work is likely to be fine. 
 
 Here's how *CV.SuperLearner* parallelizes over folds:
 
 ```
     if (parallel == "seq") {
-        cvList <- lapply(folds, FUN = .crossValFun, Y = Y, dataX = X, 
+       cvList <- lapply(folds, FUN = .crossValFun, Y = Y, dataX = X, 
             family = family, SL.library = SL.library, method = method, 
             id = id, obsWeights = obsWeights, verbose = verbose, 
             control = control, cvControl = cvControl, saveAll = saveAll)
@@ -343,6 +351,8 @@ Here's how *CV.SuperLearner* parallelizes over folds:
             saveAll = saveAll)
     }
 ```
+
+# 5a) Basic example we'll use
 
 In the examples below, I'll illustrate use of various parallel functionality in R using simple leave-one-out cross-validation for a Random Forest. 
 
@@ -366,30 +376,30 @@ Y <- X[, 1] + sqrt(abs(X[, 2] * X[, 3])) + X[, 2] - X[, 3] + rnorm(n)
 
 # 5) Basic parallel R on one machine/node
 
-## 5a) job submission 
+## 5b) job submission 
 
 Here's an example job submission script, *job-onenode.sh*.
 
 ```
-        #!/bin/bash
-        # Job name:
-        #SBATCH --job-name=test
-        #
-        # Account:
-        #SBATCH --account=co_stat
-        #
-        # Partition:
-        #SBATCH --partition=savio2
-        #
-        # Number of nodes:
-        #SBATCH --nodes=1
-        #
-        # Wall clock limit (30 seconds here):
-        #SBATCH --time=00:00:30
-        #
-        ## Command(s) to run:
-        module load r
-        R CMD BATCH --no-save mclapply.R mclapply.Rout
+#!/bin/bash
+# Job name:
+#SBATCH --job-name=test
+#
+# Account:
+#SBATCH --account=co_stat
+#
+# Partition:
+#SBATCH --partition=savio2
+#
+# Number of nodes:
+#SBATCH --nodes=1
+#
+# Wall clock limit (30 seconds here):
+#SBATCH --time=00:00:30
+#
+## Command(s) to run:
+module load r
+R CMD BATCH --no-save mclapply.R mclapply.Rout
 ```
 
 Now simply invoke:
@@ -399,7 +409,7 @@ sbatch job-onenode.sh
 
 # 5) Basic parallel R on one machine/node
 
-## 5b) Using  SLURM environment variables to control your job
+## 5c) Using  SLURM environment variables to control your job
 
 When you write your code, you may need to specify information in your code about the number of cores to use. SLURM will provide a variety of variables that you can use in your code so that it adapts to the resources you have requested rather than being hard-coded. 
 
@@ -415,7 +425,7 @@ To use multiple cores on a node (and thereby fully utilize the node that will be
 
 # 5) Basic parallel R on one machine/node
 
-## 5c) mclapply
+## 5d) mclapply
 
 Here's how we can apply LOO for this simulated dataset seen above.
 
@@ -429,7 +439,7 @@ Note that *mclapply* *forks* the master process, so all loaded packages and obje
 
 # 5) Basic parallel R on one machine/node
 
-## 5d) parLapply
+## 5e) parLapply
 
 ```
 library(parallel)
@@ -446,7 +456,7 @@ clusterExport(cl, c('X', 'Y'))
 
 # 5) Basic parallel R on one machine/node
 
-## 5e) foreach
+## 5f) foreach
 
 ```
 library(doParallel)
