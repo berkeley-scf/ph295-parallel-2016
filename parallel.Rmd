@@ -296,6 +296,9 @@ squeue -u paciorek
 squeue -j JOB_ID
 
 wwall -j JOB_ID
+
+# to see everything that is running or queued
+squeue
 ```
 
 Note that except for the *savio2_htc*  and *savio2_gpu* partitions, all jobs are given exclusive access to the entire node or nodes assigned to the job (and your account is charged for all of the cores on the node(s)). 
