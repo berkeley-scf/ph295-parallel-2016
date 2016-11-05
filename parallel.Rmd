@@ -1,6 +1,6 @@
 Workshop on Savio, Parallel R, and Data Storage
 =====================================================
-March 2016
+November 7, 2016
 ----------------------------------------------------
 
 Chris Paciorek, Department of Statistics and 

@@ -203,7 +203,7 @@ hr {
 <body>
 <h1>Workshop on Savio, Parallel R, and Data Storage</h1>
 
-<h2>March 2016</h2>
+<h2>November 7, 2016</h2>
 
 <p>Chris Paciorek, Department of Statistics and 
 Berkeley Research Computing, UC Berkeley</p>
@@ -791,10 +791,13 @@ your computation.</p>
 <ul>
 <li>If you can do your computation on the cores of a single node using
 shared memory, that will be faster than using the same number of cores
-(or even somewhat more cores) across multiple nodes. Similarly, jobs
-with a lot of data/high memory requirements that one might think of
+(or even somewhat more cores) across multiple nodes. 
+
+<ul>
+<li>Similarly, jobs with a lot of data/high memory requirements that one might think of
 as requiring Spark or Hadoop may in some cases be much faster if you can find
 a single machine with a lot of memory.</li>
+</ul></li>
 <li>That said, if you would run out of memory on a single node, then you&#39;ll
 need to use distributed memory.</li>
 </ul>
@@ -831,7 +834,7 @@ want to preschedule the tasks to reduce communication. If you have few tasks
 or tasks with highly variable completion times, you don&#39;t want to
 preschedule, to improve load-balancing.</li>
 <li>For R in particular, some of R&#39;s parallel functions allow you to say whether the 
-tasks should be prescheduled. E.g., <code>library(Rmpi); help(mpi.parSapply)</code> gives some information.</li>
+tasks should be prescheduled. E.g., <code>library(parallel); help(mclapply)</code> gives some information.</li>
 </ul>
 
 <h1>7) Parallelization strategies</h1>

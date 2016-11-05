@@ -32,7 +32,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <body>
 <div id="workshop-on-savio-parallel-r-and-data-storage" class="slide section level1">
 <h1>Workshop on Savio, Parallel R, and Data Storage</h1>
-<h2 id="march-2016">March 2016</h2>
+<h2 id="november-7-2016">November 7, 2016</h2>
 <p>Chris Paciorek, Department of Statistics and Berkeley Research Computing, UC Berkeley</p>
 </div>
 <div id="this-workshop" class="slide section level1">
@@ -465,7 +465,10 @@ stopCluster(cl)</code></pre>
 <div id="should-i-use-one-machinenode-or-many-machinesnodes" class="slide section level1">
 <h1>Should I use one machine/node or many machines/nodes?</h1>
 <ul>
-<li>If you can do your computation on the cores of a single node using shared memory, that will be faster than using the same number of cores (or even somewhat more cores) across multiple nodes. Similarly, jobs with a lot of data/high memory requirements that one might think of as requiring Spark or Hadoop may in some cases be much faster if you can find a single machine with a lot of memory.</li>
+<li>If you can do your computation on the cores of a single node using shared memory, that will be faster than using the same number of cores (or even somewhat more cores) across multiple nodes.
+<ul>
+<li>Similarly, jobs with a lot of data/high memory requirements that one might think of as requiring Spark or Hadoop may in some cases be much faster if you can find a single machine with a lot of memory.</li>
+</ul></li>
 <li>That said, if you would run out of memory on a single node, then you'll need to use distributed memory.</li>
 </ul>
 </div>
@@ -488,7 +491,7 @@ stopCluster(cl)</code></pre>
 <h1>Should multiple tasks be pre-assigned to a process (i.e., a worker) (sometimes called <em>prescheduling</em>) or should tasks be assigned dynamically as previous tasks finish?</h1>
 <ul>
 <li>Basically if you have many tasks that each take similar time, you want to preschedule the tasks to reduce communication. If you have few tasks or tasks with highly variable completion times, you don't want to preschedule, to improve load-balancing.</li>
-<li>For R in particular, some of R's parallel functions allow you to say whether the tasks should be prescheduled. E.g., <code>library(Rmpi); help(mpi.parSapply)</code> gives some information.</li>
+<li>For R in particular, some of R's parallel functions allow you to say whether the tasks should be prescheduled. E.g., <code>library(parallel); help(mclapply)</code> gives some information.</li>
 </ul>
 </div>
 <div id="parallelization-strategies-1" class="slide section level1">
